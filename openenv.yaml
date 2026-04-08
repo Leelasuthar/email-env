@@ -1,0 +1,55 @@
+name: email-env
+description: >
+  An OpenEnv RL environment simulating enterprise email triage workflows.
+  An AI agent classifies emails, generates replies, decides workflow actions,
+  and detects critical emails requiring human-in-the-loop intervention.
+version: "1.0"
+api_version: "1.0"
+entrypoint: inference.py
+
+tasks:
+  - name: classification
+    description: Route normal email to correct department (easy)
+    reward_range: [0.0, 1.0]
+
+  - name: reply
+    description: Generate a contextually appropriate reply (medium)
+    reward_range: [0.0, 1.0]
+
+  - name: workflow
+    description: Decide the next business workflow action (hard)
+    reward_range: [0.0, 1.0]
+
+  - name: human_review
+    description: Detect critical emails and flag for human intervention (hard)
+    reward_range: [0.0, 1.0]
+
+action_space:
+  type: text
+  description: A short text message (1–15 words) representing the agent's action
+
+observation_space:
+  type: object
+  fields:
+    email:
+      type: string
+      description: The full incoming email text
+    task:
+      type: string
+      description: Current task (classification / reply / workflow / human_review)
+    echoed_message:
+      type: string
+      description: The agent's last action
+    is_critical:
+      type: boolean
+      description: Whether this email requires human-in-the-loop intervention
+
+reward_range: [0.0, 1.0]
+
+env_vars:
+  - name: API_BASE_URL
+    description: Base URL of the LLM API endpoint
+  - name: MODEL_NAME
+    description: Model identifier for inference
+  - name: HF_TOKEN
+    description: Hugging Face API token

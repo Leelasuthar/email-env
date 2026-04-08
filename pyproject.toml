@@ -1,0 +1,20 @@
+[project]
+name = "email-env"
+version = "1.0.0"
+description = "An OpenEnv RL environment simulating enterprise email triage with human-in-the-loop detection for critical emails."
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "openai",
+    "requests",
+    "openenv-core>=0.2.0",
+]
+
+[project.scripts]
+server = "server.app:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
