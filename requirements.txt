@@ -2,4 +2,4 @@ fastapi
 uvicorn
 pydantic
 openai
-requests
+openenv-core>=0.2.0

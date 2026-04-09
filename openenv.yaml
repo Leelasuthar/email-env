@@ -3,8 +3,7 @@ description: >
   An OpenEnv RL environment simulating enterprise email triage workflows.
   An AI agent classifies emails, generates replies, decides workflow actions,
   and detects critical emails requiring human-in-the-loop intervention.
-version: "1.0"
-api_version: "1.0"
+version: "1.0.0"
 entrypoint: inference.py
 
 tasks:

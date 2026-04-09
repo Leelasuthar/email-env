@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+.vscode/
+.claude/
+uv.lock
+z.txt
+*.egg-info/
+dist/
+.env
+code_review_graph.db
+.crg/

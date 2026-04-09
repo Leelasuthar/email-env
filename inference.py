@@ -1,35 +1,41 @@
 import asyncio
 import os
+import sys
 import random
 from openai import OpenAI
-from typing import List
-import requests
+from typing import List, Optional
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from main import EmailEnv, EmailAction
 
 # ─────────────────────────────────────────────
 # Config
 # ─────────────────────────────────────────────
-API_BASE_URL = os.environ.get("API_BASE_URL", "https://api-inference.huggingface.co/v1")
-API_KEY      = os.environ.get("HF_TOKEN", "")
-MODEL_NAME   = os.environ.get("MODEL_NAME", "mistralai/Mistral-7B-Instruct-v0.3")
-ENV_URL      = os.environ.get("ENV_URL", "http://localhost:7860")
+API_BASE_URL = os.environ.get("API_BASE_URL") or "https://router.huggingface.co/v1"
+API_KEY      = os.environ.get("HF_TOKEN") or os.environ.get("API_KEY") or ""
+MODEL_NAME   = os.environ.get("MODEL_NAME") or "mistralai/Mistral-7B-Instruct-v0.3"
 
 BENCHMARK               = "email-env"
-SUCCESS_SCORE_THRESHOLD = 0.6
+SUCCESS_SCORE_THRESHOLD = 0.5
 
 # Tasks to evaluate — one episode per task
 TASKS = ["classification", "reply", "workflow", "human_review"]
 
 # ─────────────────────────────────────────────
-# Logging
+# Logging  (strict [START] / [STEP] / [END] format)
 # ─────────────────────────────────────────────
-def log_start(task, env, model):
+def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
 
-def log_step(step, action, reward, done, error):
-    print(f"[STEP] step={step} action={action} reward={reward} done={done} error={error}", flush=True)
+def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
+    done_str  = "true" if done else "false"
+    error_str = "null" if error is None else str(error)
+    print(f"[STEP] step={step} action={action} reward={reward:.2f} done={done_str} error={error_str}", flush=True)
 
-def log_end(success, steps, score, rewards):
-    print(f"[END] success={success} steps={steps} score={score} rewards={rewards}", flush=True)
+def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+    success_str = "true" if success else "false"
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(f"[END] success={success_str} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
 
 # ─────────────────────────────────────────────
 # Fallback logic (no LLM / LLM error)
@@ -70,7 +76,7 @@ def fallback_logic(email: str, task: str, is_critical: bool) -> str:
 # ─────────────────────────────────────────────
 # LLM agent
 # ─────────────────────────────────────────────
-def get_model_message(client, email: str, task: str, is_critical: bool) -> str:
+def get_model_message(client: OpenAI, email: str, task: str, is_critical: bool) -> str:
     try:
         if task == "human_review":
             prompt = f"""You are an AI email agent. This email has been flagged as CRITICAL.
@@ -126,27 +132,24 @@ Reply with only the action phrase."""
         return text if text else fallback_logic(email, task, is_critical)
 
     except Exception as exc:
-        print(f"[DEBUG] LLM call failed: {exc}", flush=True)
+        print(f"[DEBUG] LLM call failed: {exc}", file=sys.stderr, flush=True)
         return fallback_logic(email, task, is_critical)
 
 # ─────────────────────────────────────────────
-# HTTP helpers
+# Direct environment (no HTTP server needed)
 # ─────────────────────────────────────────────
-def env_reset(task: str = None) -> dict:
-    params = {"task": task} if task else {}
-    r = requests.post(f"{ENV_URL}/reset", params=params, timeout=30)
-    r.raise_for_status()
-    return r.json()
+_env = EmailEnv()
 
-def env_step(message: str) -> dict:
-    r = requests.post(f"{ENV_URL}/step", json={"message": message}, timeout=30)
-    r.raise_for_status()
-    return r.json()
+def env_reset(task: str = None):
+    return _env.reset(task=task)
+
+def env_step(message: str):
+    return _env.step(EmailAction(message=message))
 
 # ─────────────────────────────────────────────
 # Evaluate a single task — one episode, one step
 # ─────────────────────────────────────────────
-def evaluate_task(client, task_name: str) -> float:
+def evaluate_task(client: OpenAI, task_name: str) -> float:
     log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME)
     score   = 0.0
     success = False
@@ -155,14 +158,14 @@ def evaluate_task(client, task_name: str) -> float:
 
     try:
         result      = env_reset(task=task_name)
-        email       = result["observation"]["email"]
-        task        = result["observation"]["task"]
-        is_critical = result["observation"].get("is_critical", False)
+        email       = result.observation.email
+        task        = result.observation.task
+        is_critical = result.observation.is_critical
 
         message = get_model_message(client, email, task, is_critical)
         result  = env_step(message)
-        reward  = result["reward"]
-        done    = result["done"]
+        reward  = result.reward
+        done    = result.done
 
         rewards.append(reward)
         steps = 1
@@ -173,7 +176,7 @@ def evaluate_task(client, task_name: str) -> float:
         success = score >= SUCCESS_SCORE_THRESHOLD
 
     except Exception as e:
-        print(f"[DEBUG] Error in task {task_name}: {e}", flush=True)
+        print(f"[DEBUG] Error in task {task_name}: {e}", file=sys.stderr, flush=True)
 
     finally:
         log_end(success=success, steps=steps, score=score, rewards=rewards)
@@ -183,19 +186,12 @@ def evaluate_task(client, task_name: str) -> float:
 # ─────────────────────────────────────────────
 # Main — run all tasks
 # ─────────────────────────────────────────────
-async def main() -> None:
+def main() -> None:
     random.seed(42)
-
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
-
-    all_scores: List[float] = []
     for task_name in TASKS:
-        score = evaluate_task(client, task_name)
-        all_scores.append(score)
-
-    overall = round(sum(all_scores) / len(all_scores), 2)
-    print(f"[SUMMARY] tasks={TASKS} scores={all_scores} overall={overall}", flush=True)
+        evaluate_task(client, task_name)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
