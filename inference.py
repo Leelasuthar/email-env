@@ -172,7 +172,7 @@ def evaluate_task(client: OpenAI, task_name: str) -> float:
 
         log_step(step=1, action=message, reward=reward, done=done, error=None)
 
-        score   = round(min(max(reward, 0.0), 1.0), 2)
+        score   = round(min(max(reward, 0.01), 0.99), 2)
         success = score >= SUCCESS_SCORE_THRESHOLD
 
     except Exception as e:

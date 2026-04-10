@@ -347,7 +347,7 @@ class EmailEnv:
                     echoed_message=message,
                     is_critical=self.current_email["is_critical"],
                 ),
-                reward=0.0,
+                reward=0.01,
                 done=True,
                 info={"warning": "max steps exceeded"},
             )
@@ -373,8 +373,8 @@ class EmailEnv:
             reward = grade_classification(message, self.current_email)
             self.task = "reply"
 
-        # FIX: apply loop penalty
-        reward = max(0.0, round(reward - loop_penalty, 4))
+        # Clamp to open interval (0.01, 0.99) — evaluator requires strictly between 0 and 1
+        reward = round(max(0.01, min(0.99, reward - loop_penalty)), 4)
 
         return StepResult(
             observation=EmailObservation(
