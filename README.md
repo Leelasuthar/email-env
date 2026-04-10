@@ -118,10 +118,13 @@ python inference.py
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/` | GET | Health check |
+| `/health` | GET | Health check — returns `{"status": "healthy"}` |
+| `/metadata` | GET | Environment name and description |
+| `/schema` | GET | Action / observation / state JSON schemas |
+| `/mcp` | POST | JSON-RPC 2.0 capability endpoint |
 | `/reset` | POST | Start new episode |
 | `/step` | POST | Send action, get reward |
-| `/state` | GET | Current env state |
+| `/state` | GET | Current environment state |
 
 ## Environment variables
 
