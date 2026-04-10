@@ -11,6 +11,9 @@ dependencies = [
     "openenv-core>=0.2.0",
 ]
 
+[project.scripts]
+server = "main:serve"
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.backends.legacy:build"
