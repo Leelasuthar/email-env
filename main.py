@@ -1,10 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from typing import Optional, List
 import random
 import uvicorn
 
-app = FastAPI(title="Email Triage Environment")
+app = FastAPI(title="Email Triage Environment", version="1.0.0")
 
 # ─────────────────────────────────────────────
 # Typed Models
@@ -407,8 +407,41 @@ env = EmailEnv()
 # ─────────────────────────────────────────────
 
 @app.get("/")
-def health():
+def root():
     return {"status": "ok", "env": "email-triage"}
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
+@app.get("/metadata")
+def metadata():
+    return {
+        "name": "email-env",
+        "description": (
+            "An OpenEnv RL environment simulating enterprise email triage "
+            "with human-in-the-loop detection for critical emails."
+        ),
+        "version": "1.0.0",
+    }
+
+@app.get("/schema")
+def get_schema():
+    return {
+        "action": EmailAction.model_json_schema(),
+        "observation": EmailObservation.model_json_schema(),
+        "state": EnvState.model_json_schema(),
+    }
+
+@app.post("/mcp")
+async def mcp_endpoint(request: Request):
+    return {
+        "jsonrpc": "2.0",
+        "id": None,
+        "result": {
+            "capabilities": {"reset": True, "step": True, "state": True},
+        },
+    }
 
 @app.post("/reset", response_model=StepResult)
 def reset(task: Optional[str] = None):
