@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-server = "main:serve"
+server = "server.app:main"
 
 [build-system]
 requires = ["setuptools>=68"]
